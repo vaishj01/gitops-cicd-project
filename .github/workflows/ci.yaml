@@ -1,0 +1,67 @@
+name: CI
+
+# WHEN does the pipeline run?
+on:
+  push:
+    branches: [main]
+    paths:                       # only when app code or this workflow changes
+      - "app/**"
+      - ".github/workflows/ci.yaml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:             # adds a manual "Run workflow" button
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/task-tracker
+
+jobs:
+  # ---------------- JOB 1: run unit tests ----------------
+  test:
+    runs-on: ubuntu-latest       # GitHub gives a fresh Linux machine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r app/requirements-dev.txt
+
+      - name: Run tests
+        working-directory: app
+        run: pytest -v
+
+  # ------- JOB 2: build image, scan it, push it to GHCR -------
+  build-scan-push:
+    needs: test                  # runs ONLY if the test job passed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write            # permission to push images to GHCR
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME:${{ github.sha }} ./app
+
+      - name: Security scan with Trivy (report only for now)
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 0 \
+            $IMAGE_NAME:${{ github.sha }}
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push image
+        if: github.event_name != 'pull_request'
+        run: docker push $IMAGE_NAME:${{ github.sha }}
