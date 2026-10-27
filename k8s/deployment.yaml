@@ -6,7 +6,7 @@ metadata:
   labels:
     app: task-tracker
 spec:
-  replicas: 2                      # always keep 2 copies (pods) running
+  replicas: 3                      # always keep 2 copies (pods) running
   selector:
     matchLabels:
       app: task-tracker            # manage pods that have this label
