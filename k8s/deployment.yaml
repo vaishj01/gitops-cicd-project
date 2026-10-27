@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: task-tracker
-          image: task-tracker:v1
+          image: ghcr.io/vaishj01/task-tracker:817da3af47bdcfb703325c43bf84428a9ad32401
           imagePullPolicy: IfNotPresent   # use the image already loaded into kind
           ports:
             - containerPort: 8000
